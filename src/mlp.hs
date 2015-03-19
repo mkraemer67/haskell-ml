@@ -11,6 +11,13 @@ data Layer = Layer {
 linearLayer :: Vector Double -> Layer
 linearLayer w = Layer { weights = w, activation = id }
 
+hyperbolicLayer :: Vector Double -> Layer
+hyperbolicLayer w = Layer { weights = w, activation = tanh }
+
+sigmoidLayer :: Vector Double -> Layer
+sigmoidLayer w = Layer { weights = w, activation = sigm }
+    where sigm x = 1 / (1 + exp (-x))
+
 type Network = [Layer]
 
 _activate :: Vector Double -> Layer -> Vector Double
