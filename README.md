@@ -6,13 +6,13 @@ NOTE: This is a work in progress in its very early stages.
 ## Features
 * High speed due to hmatrix
 
-## Layers
+## Models
+### Neutral Networks
+* Multilayer perceptrons
+#### Layers
 * linear
 * hyperbolic
 * sigmoid
-
-## Models
-* Multilayer perceptrons
 
 ### Roadmap
 * Backpropagation
@@ -20,7 +20,7 @@ NOTE: This is a work in progress in its very early stages.
 * Datasets, I/O
 * Integrate with MNIST for illustration
 
-### Potential Features
+#### Potential Features
 * Convolutional neural networks
 * Recurrent neural networks
 * Backpropagation through time
