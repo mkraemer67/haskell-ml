@@ -95,6 +95,7 @@ activate x (Network { layers = ls, weights = ws }) =
 
 -- Datasets
 
+-- TODO: decouple classification/regression datasets properly
 data Dataset = Dataset [(Vector, Target)]
 data Target = Int | FpType deriving (Eq,Show)
 
