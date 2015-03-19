@@ -11,6 +11,7 @@ Main focus will likely lie on neural networks.
 * Backpropagation
 * Softmax layer
 * I/O
+* Integrate with MNIST for illustration
 
 ### Potential Features
 * Recurrent neural networks
