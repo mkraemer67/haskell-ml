@@ -24,8 +24,10 @@ NOTE: This is a work in progress in its very early stages.
 * Datasets, I/O
 * Integrate with MNIST for illustration
 * Example code
+* Simple test case(s)
 
-#### Potential Features for v0.2+
+#### Features for v0.2+ (no particular order, nothing fixed)
+* Modularization
 * Convolutional neural networks
 * Recurrent neural networks
 * Backpropagation through time
