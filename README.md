@@ -18,7 +18,7 @@ NOTE: This is a work in progress in its very early stages.
 
 ### Roadmap
 
-#### Upcoming Feature for v0.1
+#### Upcoming Features for v0.1
 * Backpropagation
 * Softmax layer
 * Datasets, I/O
