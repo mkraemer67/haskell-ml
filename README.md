@@ -17,12 +17,15 @@ NOTE: This is a work in progress in its very early stages.
 * sigmoid
 
 ### Roadmap
+
+#### Upcoming Feature for v0.1
 * Backpropagation
 * Softmax layer
 * Datasets, I/O
 * Integrate with MNIST for illustration
+* Example code
 
-#### Potential Features
+#### Potential Features for v0.2+
 * Convolutional neural networks
 * Recurrent neural networks
 * Backpropagation through time
