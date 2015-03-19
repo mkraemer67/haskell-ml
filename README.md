@@ -1,12 +1,18 @@
 # haskell-ml
 Machine Learning in Haskell with a focus on neural networks.
 
+NOTE: This is a work in progress in its very early stages.
+
 ## Features
+* High speed due to hmatrix
+
+## Layers
+* linear
+* hyperbolic
+* sigmoid
+
+## Models
 * Multilayer perceptrons
-
-## WORK IN PROGRESS
-Pretty much everything is still missing at this point. Check back from time to time!
-
 
 ### Roadmap
 * Backpropagation
