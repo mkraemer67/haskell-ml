@@ -3,6 +3,7 @@ Machine Learning in Haskell
 
 ## WORK IN PROGRESS
 Pretty much everything is still missing at this point. Check back from time to time!
+
 Main focus will likely lie on neural networks.
 
 ### Roadmap
