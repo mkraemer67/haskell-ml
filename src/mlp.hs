@@ -11,14 +11,28 @@ type Matrix = LA.Matrix FpType
 -- Generators
 
 linearLayer :: Int -> Layer
-linearLayer n = Layer { neurons = n, activation = id, layerType = "linear" }
+linearLayer n = Layer {
+    neurons   = n,
+    ϕ         = id,
+    ϕ'        = id,
+    layerType = "linear"
+}
 
 hyperbolicLayer :: Int -> Layer
-hyperbolicLayer n = Layer { neurons = n, activation = tanh, layerType = "tanh" }
+hyperbolicLayer n = Layer {
+    ϕ         = tanh,
+    ϕ'        = \x -> 1 - tanh² x,
+    neurons   = n,
+    layerType = "tanh"
+} where tanh² = tanh . tanh
 
 sigmoidLayer :: Int -> Layer
-sigmoidLayer n = Layer { neurons = n, activation = sigmoid, layerType = "sigmoid" }
-    where sigmoid x = 1 / (1 + exp (-x))
+sigmoidLayer n = Layer {
+    ϕ         = sigmoid,
+    ϕ'        = \x -> sigmoid x * (1 - sigmoid x),
+    neurons   = n,
+    layerType = "sigmoid"
+} where sigmoid x = 1 / (1 + exp (-x))
 
 -- TODO: It would be nicer to enforce #layers == #weights+1 by zipping.
 mlp :: [Layer] -> [WeightMatrix] -> Network
@@ -62,9 +76,10 @@ vecsToStr vs = intercalate "\n" (map vecToStr vs)
 -- Layers
 
 data Layer = Layer {
-    activation :: FpType -> FpType,
-    neurons    :: Int,
-    layerType  :: String
+    ϕ         :: FpType -> FpType,
+    ϕ'        :: FpType -> FpType,
+    neurons   :: Int,
+    layerType :: String
 }
 
 instance Show Layer where
@@ -81,19 +96,18 @@ data Network = Network {
 type WeightMatrix = Matrix
 
 forward :: Vector -> (Layer, WeightMatrix) -> Vector
-forward x (l,w) = mapVector ϕ $ w <> x
-    where ϕ = activation l
+forward x (l,w) = mapVector (ϕ l) $ w <> x
 
 activate :: Vector -> Network -> [Vector]
 activate x (Network { layers = ls, weights = ws }) = debug result
     where result          = scanl forward input $ zip (tail ls) ws
           input           = mapVector inputActivation x
-          inputActivation = activation (head ls)
+          inputActivation = ϕ (head ls)
           debug           = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
 
 -- Datasets
 
--- TODO: decouple classification/regression datasets properly
+-- TODO: decouple classification/regression datasets properly, add bias
 data Dataset = Dataset [(Vector, Target)]
 data Target = Int | FpType deriving (Eq,Show)
 
