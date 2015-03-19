@@ -1,7 +1,7 @@
 # haskell-ml
 Machine Learning in Haskell with a focus on neural networks.
 
-NOTE: This is a work in progress in its very early stages.
+NOTE: This is a work in progress in its very early stages. NO RELEASE YET!
 
 ## Features
 * High speed due to hmatrix
