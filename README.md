@@ -10,7 +10,7 @@ NOTE: This is a work in progress in its very early stages.
 
 ### Neutral Networks
 * Multilayer perceptrons
-* 
+
 #### Layers
 * linear
 * hyperbolic
