@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 import Data.List
 import Debug.Trace
 import Numeric.LinearAlgebra hiding (Matrix, Vector)
@@ -19,8 +17,8 @@ hyperbolicLayer :: Int -> Layer
 hyperbolicLayer n = Layer { neurons = n, activation = tanh, layerType = "tanh" }
 
 sigmoidLayer :: Int -> Layer
-sigmoidLayer n = Layer { neurons = n, activation = sigm, layerType = "sigmoid" }
-    where sigm x = 1 / (1 + exp (-x))
+sigmoidLayer n = Layer { neurons = n, activation = sigmoid, layerType = "sigmoid" }
+    where sigmoid x = 1 / (1 + exp (-x))
 
 -- TODO: It would be nicer to enforce #layers == #weights+1 by zipping.
 mlp :: [Layer] -> [WeightMatrix] -> Network
@@ -31,25 +29,25 @@ mlp ls ws = debug Network { layers = ls, weights = ws, netType = "mlp" }
 -- Initializer
 
 initVector :: MTGen -> Int -> IO (Vector)
-initVector g n = do
-    rs <- randoms g
+initVector rng n = do
+    rs <- randoms rng
     let v = fromList (take n rs)
     return v
 
 initMatrix :: MTGen -> Int -> Int -> IO (Matrix)
-initMatrix g n m = do
-    rs <- randoms g :: IO [FpType]
+initMatrix rng n m = do
+    rs <- randoms rng :: IO [FpType]
     let v = (n><m) $ take (n*m) rs
     return v
 
 initConnections :: MTGen -> (Layer, Layer) -> IO (WeightMatrix)
-initConnections g (l1,l2) = do
-    w <- initMatrix g (neurons l2) (neurons l1)
+initConnections rng (l₁,l₂) = do
+    w <- initMatrix rng (neurons l₂) (neurons l₁)
     return w
 
 initMlp :: MTGen -> [Layer] -> IO (Network)
-initMlp g ls = do
-    ws <- mapM (initConnections g) $ zip ls (tail ls)
+initMlp rng ls = do
+    ws <- mapM (initConnections rng) $ zip ls (tail ls)
     let net = mlp ls ws
     return net
 
@@ -83,15 +81,15 @@ data Network = Network {
 type WeightMatrix = Matrix
 
 forward :: Vector -> (Layer, WeightMatrix) -> Vector
-forward x (l,w) = mapVector (activation l) $ w <> x
+forward x (l,w) = mapVector ϕ $ w <> x
+    where ϕ = activation l
 
 activate :: Vector -> Network -> [Vector]
-activate x (Network { layers = ls, weights = ws }) =
-     debug result
-        where result          = scanl forward input $ zip (drop 1 ls) ws
-              input           = mapVector inputActivation x
-              inputActivation = activation (head ls)
-              debug           = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
+activate x (Network { layers = ls, weights = ws }) = debug result
+    where result          = scanl forward input $ zip (tail ls) ws
+          input           = mapVector inputActivation x
+          inputActivation = activation (head ls)
+          debug           = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
 
 -- Datasets
 
@@ -108,17 +106,16 @@ instance Show Dataset where
 
 main :: IO()
 main = do
-    g <- newMTGen Nothing
-    let sizes = [2,5,1]
-    let l1 = linearLayer 2
-    let l2 = sigmoidLayer 3
-    let l3 = linearLayer 1
-    let layers = [l1,l2,l3]
+    rng <- newMTGen Nothing
+    let l₁ = linearLayer 2
+    let l₂ = sigmoidLayer 3
+    let l₃ = linearLayer 1
+    let layers = [l₁,l₂,l₃]
 
-    net <- initMlp g layers
+    net <- initMlp rng layers
 
-    x <- initVector g 2
+    x <- initVector rng 2
     putStrLn $ "x = " ++ vecToStr x ++ "\n"
 
-    let !y = activate x net
+    let y = activate x net
     putStrLn $ "y = " ++ vecToStr (last y)
