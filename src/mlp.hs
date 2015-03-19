@@ -53,8 +53,9 @@ forward x (l,w) = w <> x
 
 activate :: Vector Double -> Network -> [Vector Double]
 activate x (Network { layers = ls, weights = ws }) =
-     debug $ scanl forward input $ zip (drop 1 ls) ws
-        where input           = mapVector inputActivation x
+     debug $ result
+        where result          = scanl forward input $ zip (drop 1 ls) ws
+              input           = mapVector inputActivation x
               inputActivation = activation (head ls)
               debug           = trace ("activate\nin: " ++ show x ++ "\nout: " ++ show result ++ "\n")
 
