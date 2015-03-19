@@ -7,8 +7,10 @@ NOTE: This is a work in progress in its very early stages.
 * High speed due to hmatrix
 
 ## Models
+
 ### Neutral Networks
 * Multilayer perceptrons
+* 
 #### Layers
 * linear
 * hyperbolic
