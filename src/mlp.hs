@@ -1,31 +1,9 @@
+import Debug.Trace
 import Numeric.LinearAlgebra
-import Numeric.LinearAlgebra.LAPACK
-import Numeric.LinearAlgebra.Data
 import System.Random.Mersenne
 
-data Layer = Layer {
-    activation :: Double -> Double,
-    weights    :: Vector Double,
-    kind       :: String
-}
 
-linearLayer :: Vector Double -> Layer
-linearLayer w = Layer { weights = w, activation = id, kind = "linear" }
-
-hyperbolicLayer :: Vector Double -> Layer
-hyperbolicLayer w = Layer { weights = w, activation = tanh, kind = "tanh" }
-
-sigmoidLayer :: Vector Double -> Layer
-sigmoidLayer w = Layer { weights = w, activation = sigm, kind = "sigmoid" }
-    where sigm x = 1 / (1 + exp (-x))
-
-type Network = [Layer]
-
-_activate :: Vector Double -> Layer -> Vector Double
-_activate x layer = x  -------- TODO
-
-activate :: Vector Double -> Network -> Vector Double
-activate = foldl _activate
+-- Helpers
 
 initVector :: MTGen -> Int -> IO (Vector Double)
 initVector g n = do
@@ -33,17 +11,79 @@ initVector g n = do
     let v = fromList (take n rs)
     return v
 
+initMatrix :: MTGen -> Int -> Int -> IO (Matrix Double)
+initMatrix g n m = do
+    rs <- randoms g :: IO [Double]
+    let v = (n><m) $ take (n*m) rs
+    return v
+
+
+-- Layers
+
+data Layer = Layer {
+    activation :: Double -> Double,
+    neurons    :: Int,
+    layerType  :: String
+}
+
 instance Show Layer where
-    show (Layer {activation = a, weights = w, kind = k}) = k ++ " " ++ show w
+    show (Layer { neurons = n, layerType = k }) = k ++ ", " ++ show n ++ " neurons"
+
+linearLayer :: Int -> Layer
+linearLayer n = Layer { neurons = n, activation = id, layerType = "linear" }
+
+hyperbolicLayer :: Int -> Layer
+hyperbolicLayer n = Layer { neurons = n, activation = tanh, layerType = "tanh" }
+
+sigmoidLayer :: Int -> Layer
+sigmoidLayer n = Layer { neurons = n, activation = sigm, layerType = "sigmoid" }
+    where sigm x = 1 / (1 + exp (-x))
+
+
+-- Networks
+
+data Network = Network {
+    layers  :: [Layer],
+    weights :: [Matrix Double],
+    netType :: String
+}
+
+mlp :: [Layer] -> [Matrix Double] -> Network
+mlp ls ws = Network { layers = ls, weights = ws, netType = "mlp" }
+
+forward :: Vector Double -> (Layer, Matrix Double) -> Vector Double
+forward x (l,w) = x ------------ TODO
+
+activate :: Vector Double -> Network -> [Vector Double]
+activate x (Network { layers = ls, weights = ws }) =
+    trace ("activate\nin: " ++ show x ++ "\nout: " ++ show result ++ "\n") $ result
+        where result          = scanl forward (mapVector inputActivation x) $ zip (drop 1 ls) ws
+              inputActivation = activation (head ls)
+
+initConnections :: MTGen -> (Layer, Layer) -> IO (Matrix Double)
+initConnections g ((Layer { neurons = n }), (Layer { neurons = m })) = do
+    w <- initMatrix g n m
+    return w
+
+initMlp :: MTGen -> [Layer] -> IO (Network)
+initMlp g ls = do
+    ws <- mapM (initConnections g) $ zip ls (tail ls)
+    let net = mlp ls ws
+    return net
+
+
+-- Testing
 
 main :: IO()
 main = do
     g <- newMTGen Nothing
-    let sizes = [10,20,2]
-    weights <- mapM (initVector g) sizes
-    let net = map linearLayer weights
-    mapM_ (\x -> putStrLn ("Layer " ++ show (fst x) ++ ": " ++ show (snd x))) (zip [1..] net)
-    x <- initVector g 10
-    putStrLn $ "Input: " ++ show x
+    let sizes = [2,3,1]
+    let layers = map linearLayer sizes
+    mapM_ (\x -> putStrLn ("Layer " ++ show (fst x) ++ ": " ++ show (snd x) ++ "")) (zip [1..] layers)
+    net <- initMlp g layers
+
+    x <- initVector g 2
+    putStrLn $ "\nInput: " ++ show x ++ "\n"
+
     let y = activate x net
-    putStrLn $ "Output: " ++ show y
+    putStrLn $ "Output: " ++ show y ++ "\n"
