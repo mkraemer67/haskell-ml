@@ -100,10 +100,10 @@ forward x (l,w) = mapVector (ϕ l) $ w <> x
 
 activate :: Vector -> Network -> [Vector]
 activate x (Network { layers = ls, weights = ws }) = debug result
-    where result          = scanl forward input $ zip (tail ls) ws
-          input           = mapVector inputActivation x
-          inputActivation = ϕ (head ls)
-          debug           = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
+    where result = scanl forward ϕx $ zip (tail ls) ws
+          ϕx     = mapVector ϕ₁ x
+          ϕ₁     = ϕ (head ls)
+          debug  = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
 
 -- Datasets
 
