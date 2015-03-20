@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 import Data.List
 import Debug.Trace
 import Numeric.LinearAlgebra hiding (Matrix, Vector)
@@ -7,38 +9,6 @@ import System.Random.Mersenne
 type FpType = Double
 type Vector = LA.Vector FpType
 type Matrix = LA.Matrix FpType
-
--- Generators
-
-linearLayer :: Int -> Layer
-linearLayer n = Layer {
-    neurons   = n,
-    ϕ         = id,
-    ϕ'        = id,
-    layerType = "linear"
-}
-
-hyperbolicLayer :: Int -> Layer
-hyperbolicLayer n = Layer {
-    ϕ         = tanh,
-    ϕ'        = \x -> 1 - tanh² x,
-    neurons   = n,
-    layerType = "tanh"
-} where tanh² = tanh . tanh
-
-sigmoidLayer :: Int -> Layer
-sigmoidLayer n = Layer {
-    ϕ         = sigmoid,
-    ϕ'        = \x -> sigmoid x * (1 - sigmoid x),
-    neurons   = n,
-    layerType = "sigmoid"
-} where sigmoid x = 1 / (1 + exp (-x))
-
--- TODO: It would be nicer to enforce #layers == #weights+1 by zipping.
-mlp :: [Layer] -> [WeightMatrix] -> Network
-mlp ls ws = debug Network { layers = ls, weights = ws, netType = "mlp" }
-    where text  = map (\x -> "Layer " ++ show (fst x) ++ ": " ++ show (snd x)) (zip [1..] ls)
-          debug = trace $ "Creating MLP\n" ++ intercalate "\n" text ++ "\n"
 
 -- Initializer
 
@@ -73,6 +43,11 @@ vecToStr v = "[ " ++ intercalate "  " (map show (toList v)) ++ " ]"
 vecsToStr :: [Vector] -> String
 vecsToStr vs = intercalate "\n" (map vecToStr vs)
 
+datasetToStr :: Dataset -> String
+datasetToStr d = "dataset: " ++ show l ++ " elements, " ++ show u ++ " targets\n"
+    where u = nub (map snd d)
+          l = length d
+
 -- Layers
 
 data Layer = Layer {
@@ -85,6 +60,30 @@ data Layer = Layer {
 instance Show Layer where
     show (Layer { neurons = n, layerType = t }) = t ++ ", " ++ show n ++ " neurons"
 
+linearLayer :: Int -> Layer
+linearLayer n = Layer {
+    ϕ         = id,
+    ϕ'        = id,
+    neurons   = n,
+    layerType = "linear"
+}
+
+hyperbolicLayer :: Int -> Layer
+hyperbolicLayer n = Layer {
+    ϕ         = tanh,
+    ϕ'        = \x -> 1 - tanh² x,
+    neurons   = n,
+    layerType = "tanh"
+} where tanh² = tanh . tanh
+
+sigmoidLayer :: Int -> Layer
+sigmoidLayer n = Layer {
+    ϕ         = sigmoid,
+    ϕ'        = \x -> sigmoid x * (1 - sigmoid x),
+    neurons   = n,
+    layerType = "sigmoid"
+} where sigmoid x = 1 / (1 + exp (-x))
+
 -- Networks
 
 data Network = Network {
@@ -95,11 +94,17 @@ data Network = Network {
 
 type WeightMatrix = Matrix
 
+--TODO: It would be nicer to enforce #layers == #weights+1 by zipping.
+mlp :: [Layer] -> [WeightMatrix] -> Network
+mlp ls ws = debug Network { layers = ls, weights = ws, netType = "mlp" }
+    where text  = map (\x -> "Layer " ++ show (fst x) ++ ": " ++ show (snd x)) (zip [1..] ls)
+          debug = trace $ "Creating MLP\n" ++ intercalate "\n" text ++ "\n"
+
 forward :: Vector -> (Layer, WeightMatrix) -> Vector
 forward x (l,w) = mapVector (ϕ l) $ w <> x
 
-activate :: Vector -> Network -> [Vector]
-activate x (Network { layers = ls, weights = ws }) = debug result
+activate :: Network -> Vector -> [Vector]
+activate (Network { layers = ls, weights = ws }) x = debug result
     where result = scanl forward ϕx $ zip (tail ls) ws
           ϕx     = mapVector ϕ₁ x
           ϕ₁     = ϕ (head ls)
@@ -107,29 +112,69 @@ activate x (Network { layers = ls, weights = ws }) = debug result
 
 -- Datasets
 
--- TODO: decouple classification/regression datasets properly, add bias
-data Dataset = Dataset [(Vector, Target)]
-data Target = Int | FpType deriving (Eq,Show)
+--TODO: decouple classification/regression datasets properly, add bias
+type Dataset = [(Vector, Vector)]
 
-instance Show Dataset where
-    show (Dataset d) = "dataset: " ++ show l ++ " elements, " ++ show u ++ " targets\n"
-        where u = nub (map snd d)
-              l = length d
+-- Training
+
+--TODO: more useful termination criteria
+data Trainer = Trainer {
+    η         :: FpType,
+    terminate :: TrainState -> Bool
+}
+
+data TrainState = TrainState {
+    nEpochs :: Int
+} deriving (Show)
+
+data EpochResult = EpochResult {
+    δ :: FpType
+} deriving (Show)
+
+nEpochTrainer :: FpType -> Int -> Trainer
+nEpochTrainer lr n = debug Trainer { η = lr, terminate = (> n) . nEpochs }
+    where debug = trace ("Creating nEpochTrainer\n" ++ "η = " ++ show lr ++ "\nmaxEpochs = " ++ show n ++ "\n")
+
+--TODO: actually perform epoch inside ST monad, put actual result
+epoch :: Dataset -> Network -> Trainer -> (Network, EpochResult)
+epoch d net t = (net, EpochResult 0)
+
+_train :: TrainState -> Dataset -> Network -> Trainer -> Network
+_train s d net t = do
+    let (net',result') = epoch d net t
+    let s' = update s where update s = TrainState (1 + (nEpochs s))
+    let status = show result' ++ "\n" ++ show s' ++ "\n"
+
+    if (terminate t) s'
+        then trace ("Finished Training.\n") net'
+        else trace status $ _train s' d net' t
+
+
+train :: Dataset -> Network -> Trainer -> Network
+train = _train s₀
+    where s₀ = TrainState 0
+
+-- Evaluation
+
+--TODO
 
 -- Testing
 
 main :: IO()
 main = do
     rng <- newMTGen Nothing
-    let l₁ = linearLayer 2
+
+    let l₁ = linearLayer 5
     let l₂ = sigmoidLayer 3
-    let l₃ = linearLayer 1
+    let l₃ = linearLayer 5
     let layers = [l₁,l₂,l₃]
 
-    net <- initMlp rng layers
+    !net <- initMlp rng layers
+    xs <- mapM (initVector rng) (take 100 $ repeat 5)
 
-    x <- initVector rng 2
-    putStrLn $ "x = " ++ vecToStr x ++ "\n"
+    let ys = xs
+    let dataset = zip xs ys
+    let trainer = nEpochTrainer 0.1 100
+    let !trainedNet = train dataset net trainer
 
-    let y = activate x net
-    putStrLn $ "y = " ++ vecToStr (last y)
+    putStrLn $ "Done!\n"
