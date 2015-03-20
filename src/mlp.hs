@@ -1,15 +1,23 @@
 {-# LANGUAGE BangPatterns #-}
 
+import Control.Monad.ST
 import Data.Char
 import Data.List
 import Debug.Trace
 import Numeric.LinearAlgebra hiding (Matrix, Vector)
 import qualified Numeric.LinearAlgebra as LA
 import System.Random.Mersenne
+import System.Random.Shuffle
+
+-- Aliases
 
 type FpType = Double
 type Vector = LA.Vector FpType
 type Matrix = LA.Matrix FpType
+
+type Delta = FpType
+type LearningRate = FpType
+type Ratio = FpType
 
 -- Initializer
 
@@ -27,7 +35,7 @@ initMatrix rng n m = do
 
 initConnections :: MTGen -> (Layer, Layer) -> IO (WeightMatrix)
 initConnections rng (l₁,l₂) = do
-    w <- initMatrix rng (neurons l₂) (neurons l₁)
+    w <- initMatrix rng (nNeurons l₂) (nNeurons l₁)
     return w
 
 initMlp :: MTGen -> [Layer] -> IO (Network)
@@ -55,18 +63,18 @@ datasetToStr d = "dataset: " ++ show l ++ " elements, " ++ show u ++ " targets\n
 data Layer = Layer {
     ϕ         :: FpType -> FpType,
     ϕ'        :: FpType -> FpType,
-    neurons   :: Int,
+    nNeurons  :: Int,
     layerType :: String
 }
 
 instance Show Layer where
-    show (Layer { neurons = n, layerType = t }) = t ++ ", " ++ show n ++ " neurons"
+    show (Layer { nNeurons = n, layerType = t }) = t ++ ", " ++ show n ++ " neurons"
 
 linearLayer :: Int -> Layer
 linearLayer n = Layer {
     ϕ         = id,
     ϕ'        = id,
-    neurons   = n,
+    nNeurons  = n,
     layerType = "linear"
 }
 
@@ -74,7 +82,7 @@ hyperbolicLayer :: Int -> Layer
 hyperbolicLayer n = Layer {
     ϕ         = tanh,
     ϕ'        = \x -> 1 - tanh² x,
-    neurons   = n,
+    nNeurons  = n,
     layerType = "tanh"
 } where tanh² = tanh . tanh
 
@@ -82,7 +90,7 @@ sigmoidLayer :: Int -> Layer
 sigmoidLayer n = Layer {
     ϕ         = sigmoid,
     ϕ'        = \x -> sigmoid x * (1 - sigmoid x),
-    neurons   = n,
+    nNeurons  = n,
     layerType = "sigmoid"
 } where sigmoid x = 0.5 * (1 + tanh (0.5 * x))
 
@@ -107,9 +115,7 @@ forward x (l,w) = mapVector (ϕ l) $ w <> x
 
 activate :: Network -> Vector -> [Vector]
 activate (Network { layers = ls, weights = ws }) x = debug result
-    where result = scanl forward ϕx $ zip (tail ls) ws
-          ϕx     = mapVector ϕ₁ x
-          ϕ₁     = ϕ (head ls)
+    where result = scanl forward x $ zip (tail ls) ws
           debug  = trace ("activate input\n" ++ vecToStr x ++ "\n\nactivate output\n" ++ vecsToStr result ++ "\n")
 
 -- Datasets
@@ -117,42 +123,59 @@ activate (Network { layers = ls, weights = ws }) x = debug result
 --TODO: decouple classification/regression datasets properly, add bias s.t. it works flawlessly in all usages
 type Dataset = [(Vector, Vector)]
 
+--TODO: shuffle and split
+split :: MTGen -> Dataset -> Ratio -> (Dataset, Dataset)
+split rng d r = (d,d)
+
 -- Training
 
+--TODO: add momentum μ
 data Trainer = Trainer {
-    η         :: FpType,
+    η         :: LearningRate,
     terminate :: TrainState -> Bool
 }
 
 data TrainState = TrainState {
     nEpochs :: Int,
-    δs      :: [FpType]
+    δs      :: [Delta]
 } deriving (Show)
 
-type Error = FpType
-
 --TODO: more useful termination criteria
-nEpochTrainer :: FpType -> Int -> Trainer
+nEpochTrainer :: LearningRate -> Int -> Trainer
 nEpochTrainer lr n = debug Trainer { η = lr, terminate = (> n) . nEpochs }
     where debug = trace ("Creating nEpochTrainer\n" ++ "η = " ++ show lr ++ "\nmaxEpochs = " ++ show n ++ "\n")
 
---TODO: actually perform epoch inside ST monad, put actual result
-epoch :: Dataset -> Network -> Trainer -> (Network, Error)
-epoch d net t = (net, 0)
+_epoch :: Delta -> Dataset -> Network -> Trainer -> (Network, Delta)
+_epoch δs ds net t = runST $ do
+    return (net,0.0)
+    --mapM_ f ds where
+    --    f d = do
+    --        let y = activate net (fst d)
+    --        let δ = sum . (**2) $ (snd d) - y
+    --        -- TODO: backpropagate
+    --        _epoch (δs + δ) ds net t
 
-_train :: TrainState -> Dataset -> Network -> Trainer -> Network
+epoch :: Dataset -> Network -> Trainer -> (Network, Delta)
+epoch = _epoch 0
+
+_train :: TrainState -> Dataset -> Network -> Trainer -> IO (Network)
 _train s d net t = do
     let (net',δ') = epoch d net t
     let s' = update s where update s = TrainState { nEpochs = 1 + (nEpochs s), δs = δs s ++ [δ'] }
     let statusMessage = "δ_" ++ show (nEpochs s') ++ " = " ++ show δ' ++ "\n" ++ show s' ++ "\n"
 
+    d' <- shuffleM d
     if (terminate t) s'
-        then trace ("Finished Training.\n") net'
-        else trace statusMessage $ _train s' d net' t
+        then trace ("Finished Training.\n") return net'
+        else trace statusMessage $ _train s' d' net' t
 
---TODO: support testing set/cross validation
-train :: Dataset -> Network -> Trainer -> Network
+--TODO: support testing set + optional validation set
+train :: Dataset -> Network -> Trainer -> IO (Network)
 train = _train s₀ where s₀ = TrainState { nEpochs = 0, δs = [] }
+
+--TODO
+crossvalidate :: Int -> Dataset -> Network -> Trainer -> IO (Network)
+crossvalidate n = trace ("Cross-validation is not implemented!") train
 
 -- Evaluation
 
@@ -162,6 +185,7 @@ train = _train s₀ where s₀ = TrainState { nEpochs = 0, δs = [] }
 
 main :: IO()
 main = do
+    putStrLn ""
     rng <- newMTGen Nothing
 
     let l₁ = linearLayer 5
@@ -175,6 +199,6 @@ main = do
     let ys = xs
     let dataset = zip xs ys
     let trainer = nEpochTrainer 0.1 5
-    let !trainedNet = train dataset net trainer
+    !trainedNet <- train dataset net trainer
 
     putStrLn $ "Done!\n"
