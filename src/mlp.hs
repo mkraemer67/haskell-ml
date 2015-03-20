@@ -51,6 +51,7 @@ datasetToStr d = "dataset: " ++ show l ++ " elements, " ++ show u ++ " targets\n
 
 -- Layers
 
+--TODO: allow 2d tensors for activation as well to facilitate softmax
 data Layer = Layer {
     ϕ         :: FpType -> FpType,
     ϕ'        :: FpType -> FpType,
@@ -83,7 +84,7 @@ sigmoidLayer n = Layer {
     ϕ'        = \x -> sigmoid x * (1 - sigmoid x),
     neurons   = n,
     layerType = "sigmoid"
-} where sigmoid x = 1 / (1 + exp (-x))
+} where sigmoid x = 0.5 * (1 + tanh (0.5 * x))
 
 -- Networks
 
@@ -113,7 +114,7 @@ activate (Network { layers = ls, weights = ws }) x = debug result
 
 -- Datasets
 
---TODO: decouple classification/regression datasets properly, add bias
+--TODO: decouple classification/regression datasets properly, add bias s.t. it works flawlessly in all usages
 type Dataset = [(Vector, Vector)]
 
 -- Training
@@ -149,6 +150,7 @@ _train s d net t = do
         then trace ("Finished Training.\n") net'
         else trace statusMessage $ _train s' d net' t
 
+--TODO: support testing set/cross validation
 train :: Dataset -> Network -> Trainer -> Network
 train = _train s₀ where s₀ = TrainState { nEpochs = 0, δs = [] }
 
