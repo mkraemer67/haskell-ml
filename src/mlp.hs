@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
+import Data.Char
 import Data.List
 import Debug.Trace
 import Numeric.LinearAlgebra hiding (Matrix, Vector)
@@ -117,42 +118,39 @@ type Dataset = [(Vector, Vector)]
 
 -- Training
 
---TODO: more useful termination criteria
 data Trainer = Trainer {
     η         :: FpType,
     terminate :: TrainState -> Bool
 }
 
 data TrainState = TrainState {
-    nEpochs :: Int
+    nEpochs :: Int,
+    δs      :: [FpType]
 } deriving (Show)
 
-data EpochResult = EpochResult {
-    δ :: FpType
-} deriving (Show)
+type Error = FpType
 
+--TODO: more useful termination criteria
 nEpochTrainer :: FpType -> Int -> Trainer
 nEpochTrainer lr n = debug Trainer { η = lr, terminate = (> n) . nEpochs }
     where debug = trace ("Creating nEpochTrainer\n" ++ "η = " ++ show lr ++ "\nmaxEpochs = " ++ show n ++ "\n")
 
 --TODO: actually perform epoch inside ST monad, put actual result
-epoch :: Dataset -> Network -> Trainer -> (Network, EpochResult)
-epoch d net t = (net, EpochResult 0)
+epoch :: Dataset -> Network -> Trainer -> (Network, Error)
+epoch d net t = (net, 0)
 
 _train :: TrainState -> Dataset -> Network -> Trainer -> Network
 _train s d net t = do
-    let (net',result') = epoch d net t
-    let s' = update s where update s = TrainState (1 + (nEpochs s))
-    let status = show result' ++ "\n" ++ show s' ++ "\n"
+    let (net',δ') = epoch d net t
+    let s' = update s where update s = TrainState { nEpochs = 1 + (nEpochs s), δs = δs s ++ [δ'] }
+    let statusMessage = "δ_" ++ show (nEpochs s') ++ " = " ++ show δ' ++ "\n" ++ show s' ++ "\n"
 
     if (terminate t) s'
         then trace ("Finished Training.\n") net'
-        else trace status $ _train s' d net' t
-
+        else trace statusMessage $ _train s' d net' t
 
 train :: Dataset -> Network -> Trainer -> Network
-train = _train s₀
-    where s₀ = TrainState 0
+train = _train s₀ where s₀ = TrainState { nEpochs = 0, δs = [] }
 
 -- Evaluation
 
@@ -174,7 +172,7 @@ main = do
 
     let ys = xs
     let dataset = zip xs ys
-    let trainer = nEpochTrainer 0.1 100
+    let trainer = nEpochTrainer 0.1 5
     let !trainedNet = train dataset net trainer
 
     putStrLn $ "Done!\n"
